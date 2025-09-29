@@ -1,212 +1,215 @@
 import os
+import sqlite3
 from datetime import datetime, timezone
-from flask import Flask, request, jsonify, send_from_directory
+from flask import Flask, render_template, request, jsonify, send_from_directory
 from flask_cors import CORS
-from pymongo import MongoClient
 import logging
+from contextlib import contextmanager
 
 app = Flask(__name__)
 CORS(app)
 
-# Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Get port from environment (Render uses this)
 port = int(os.environ.get('PORT', 5000))
 
-# ✅ MongoDB Atlas connection string with TLS enabled
-#    Make sure pymongo>=4.3.3 is in requirements.txt
-MONGODB_URI = (
-    "mongodb+srv://sagarkohli784_db_user:AwJpcHZhEvZT2Edq"
-    "@sagar.btxiumr.mongodb.net/AapkiApniTaxi"
-    "?retryWrites=true&w=majority&tls=true"
-)
-DATABASE_NAME = "AapkiApniTaxi"
-COLLECTION_NAME = "bookings"
+DATABASE_FILE = 'taxi_bookings.db'
 
-# Global variables
-client = None
-db = None
-bookings_collection = None
-
-
-def initialize_mongodb():
-    """Initialize MongoDB connection with TLS."""
-    global client, db, bookings_collection
+def init_database():
     try:
-        print("🔍 Connecting to MongoDB Atlas...")
-        print(f"📡 Host: sagar.btxiumr.mongodb.net")
-
-        client = MongoClient(
-            MONGODB_URI,
-            serverSelectionTimeoutMS=30000  # 30-second timeout
-        )
-
-        # Test the connection
-        client.admin.command('ping')
-        db = client[DATABASE_NAME]
-        bookings_collection = db[COLLECTION_NAME]
-
-        # Create index safely
-        try:
-            bookings_collection.create_index("id", unique=True)
-        except Exception:
-            pass
-
-        count = bookings_collection.count_documents({})
-        logger.info(f"✅ MongoDB connected successfully! Found {count} existing bookings.")
-        print(f"✅ MongoDB connected! Found {count} bookings.")
-        return True
-
+        with sqlite3.connect(DATABASE_FILE) as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS bookings (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL,
+                    phone TEXT NOT NULL,
+                    pickup TEXT NOT NULL,
+                    drop_location TEXT NOT NULL,
+                    datetime TEXT NOT NULL,
+                    seats INTEGER NOT NULL,
+                    status TEXT DEFAULT 'pending',
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                )
+            ''')
+            conn.commit()
+            print("✅ SQLite database initialized successfully!")
+            return True
     except Exception as e:
-        logger.error(f"❌ MongoDB connection failed: {e}")
-        print(f"❌ MongoDB Error: {e}")
+        logger.error(f"❌ Database initialization failed: {e}")
         return False
 
-
-def get_next_booking_id():
-    if bookings_collection is None:
-        return 1
+@contextmanager
+def get_db_connection():
+    conn = sqlite3.connect(DATABASE_FILE)
+    conn.row_factory = sqlite3.Row
     try:
-        pipeline = [{"$group": {"_id": None, "max_id": {"$max": "$id"}}}]
-        result = list(bookings_collection.aggregate(pipeline))
-        if result and result[0]["max_id"]:
-            return result[0]["max_id"] + 1
-        return 1
-    except Exception as e:
-        logger.error(f"Error getting next booking ID: {e}")
-        return 1
-
+        yield conn
+    finally:
+        conn.close()
 
 @app.route('/')
 def index():
     return send_from_directory('.', 'index.html')
 
-
 @app.route('/<path:filename>')
 def serve_static(filename):
     return send_from_directory('.', filename)
 
-
 @app.route('/api/health', methods=['GET'])
 def health_check():
-    return jsonify({
-        'status': 'healthy',
-        'mongodb': 'connected' if bookings_collection is not None else 'disconnected',
-        'sms': 'disabled',
-        'timestamp': datetime.now(timezone.utc).isoformat(),
-        'cluster': 'sagar.btxiumr.mongodb.net'
-    })
-
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('SELECT COUNT(*) FROM bookings')
+            count = cursor.fetchone()[0]
+        return jsonify({
+            'status': 'healthy',
+            'database': 'connected',
+            'database_type': 'SQLite',
+            'total_bookings': count,
+            'sms': 'disabled',
+            'timestamp': datetime.now(timezone.utc).isoformat()
+        })
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'database': 'disconnected',
+            'error': str(e)
+        }), 500
 
 @app.route('/api/bookings', methods=['POST'])
 def create_booking():
     try:
         data = request.get_json()
-        logger.info(f"📝 New booking request: {data.get('name')} - {data.get('phone')}")
-        if bookings_collection is None:
-            return jsonify({'success': False, 'error': 'Database connection unavailable'}), 500
+        logger.info(f"📝 New booking: {data.get('name')} - {data.get('phone')}")
 
         required_fields = ['name', 'phone', 'pickup', 'drop', 'datetime', 'seats']
-        missing_fields = [f for f in required_fields if not data.get(f)]
+        missing_fields = [field for field in required_fields if not data.get(field)]
+
         if missing_fields:
             return jsonify({'success': False, 'error': f'Missing fields: {", ".join(missing_fields)}'}), 400
 
         try:
             seats = int(data['seats'])
             if seats < 1 or seats > 6:
-                return jsonify({'success': False, 'error': 'Seats must be between 1 and 6'}), 400
+                return jsonify({'success': False, 'error': 'Seats must be 1-6'}), 400
         except ValueError:
-            return jsonify({'success': False, 'error': 'Invalid seats value'}), 400
+            return jsonify({'success': False, 'error': 'Invalid seats'}), 400
 
-        booking_id = get_next_booking_id()
-        booking = {
-            'id': booking_id,
-            'name': data['name'].strip(),
-            'phone': data['phone'].strip(),
-            'pickup': data['pickup'].strip(),
-            'drop': data['drop'].strip(),
-            'datetime': data['datetime'],
-            'seats': seats,
-            'status': 'pending',
-            'createdAt': datetime.now(timezone.utc).isoformat(),
-            'updatedAt': datetime.now(timezone.utc).isoformat()
-        }
+        current_time = datetime.now(timezone.utc).isoformat()
 
-        result = bookings_collection.insert_one(booking)
-        logger.info(f"💾 Booking saved to MongoDB with ObjectId: {result.inserted_id}")
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                INSERT INTO bookings (name, phone, pickup, drop_location, datetime, seats, status, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                data['name'].strip(),
+                data['phone'].strip(), 
+                data['pickup'].strip(),
+                data['drop'].strip(),
+                data['datetime'],
+                seats,
+                'pending',
+                current_time,
+                current_time
+            ))
+            booking_id = cursor.lastrowid
+            conn.commit()
 
-        booking_response = booking.copy()
-        booking_response.pop('_id', None)
+        logger.info(f"💾 Booking {booking_id} saved successfully")
+
         return jsonify({
             'success': True,
             'booking_id': booking_id,
             'message': 'Booking created successfully',
             'sms_sent': False,
-            'booking': booking_response
+            'booking': {
+                'id': booking_id,
+                'name': data['name'].strip(),
+                'phone': data['phone'].strip(),
+                'pickup': data['pickup'].strip(),
+                'drop': data['drop'].strip(),
+                'datetime': data['datetime'],
+                'seats': seats,
+                'status': 'pending',
+                'createdAt': current_time,
+                'updatedAt': current_time
+            }
         })
+
     except Exception as e:
         logger.error(f"Error creating booking: {e}")
-        return jsonify({'success': False, 'error': 'Internal server error'}), 500
-
+        return jsonify({'success': False, 'error': 'Server error'}), 500
 
 @app.route('/api/bookings', methods=['GET'])
 def get_all_bookings():
     try:
-        if bookings_collection is None:
-            return jsonify({'success': False, 'error': 'Database connection unavailable'}), 500
-        bookings = list(bookings_collection.find().sort('createdAt', -1))
-        for b in bookings:
-            b.pop('_id', None)
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT id, name, phone, pickup, drop_location as drop, datetime, seats, status, 
+                       created_at as createdAt, updated_at as updatedAt
+                FROM bookings ORDER BY created_at DESC
+            ''')
+            rows = cursor.fetchall()
+            bookings = [dict(row) for row in rows]
+
         return jsonify({'success': True, 'bookings': bookings})
     except Exception as e:
         logger.error(f"Error getting bookings: {e}")
-        return jsonify({'success': False, 'error': 'Internal server error'}), 500
-
+        return jsonify({'success': False, 'error': 'Server error'}), 500
 
 @app.route('/api/bookings/<int:booking_id>/update', methods=['POST'])
 def update_booking_status(booking_id):
     try:
         data = request.get_json()
         new_status = data.get('status')
+
         if new_status not in ['pending', 'confirmed', 'rejected']:
             return jsonify({'success': False, 'error': 'Invalid status'}), 400
-        if bookings_collection is None:
-            return jsonify({'success': False, 'error': 'Database connection unavailable'}), 500
 
-        result = bookings_collection.update_one(
-            {'id': booking_id},
-            {'$set': {'status': new_status, 'updatedAt': datetime.now(timezone.utc).isoformat()}}
-        )
-        if result.modified_count > 0:
-            return jsonify({'success': True,
-                            'message': f'Booking {booking_id} updated to {new_status}',
-                            'sms_sent': False})
-        else:
-            return jsonify({'success': False, 'error': 'Booking not found'}), 404
+        current_time = datetime.now(timezone.utc).isoformat()
+
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('UPDATE bookings SET status = ?, updated_at = ? WHERE id = ?', 
+                         (new_status, current_time, booking_id))
+
+            if cursor.rowcount > 0:
+                conn.commit()
+                return jsonify({
+                    'success': True,
+                    'message': f'Booking {booking_id} updated to {new_status}',
+                    'sms_sent': False
+                })
+            else:
+                return jsonify({'success': False, 'error': 'Booking not found'}), 404
+
     except Exception as e:
-        logger.error(f"Error updating booking status: {e}")
-        return jsonify({'success': False, 'error': 'Internal server error'}), 500
+        logger.error(f"Error updating booking: {e}")
+        return jsonify({'success': False, 'error': 'Server error'}), 500
 
+print("🚖 Starting Aapki Apni Taxi Server (SQLite)...")
+print("="*50)
+print("💾 Database: Local SQLite")
+print("📱 SMS: Disabled")
+print("🌐 Server: Production")
+print("="*50)
 
-# ----- Startup -----
-print("🚖 Starting Aapki Apni Taxi Server (MongoDB Only)...")
-print("=" * 50)
-print("📡 MongoDB Host: sagar.btxiumr.mongodb.net")
-print("📱 SMS: Disabled (as requested)")
-print("🌐 Server: Production mode")
-print("=" * 50)
+db_ok = init_database()
 
-mongodb_ok = initialize_mongodb()
-
-print("\n🎯 FINAL STATUS:")
-if mongodb_ok:
-    print("✅ MongoDB: Connected - BOOKING SYSTEM READY!")
+if db_ok:
+    print("✅ SQLite Database: Ready!")
+    print("✅ Booking system: Fully functional")
+    print("✅ NO SSL issues!")
 else:
-    print("❌ MongoDB: FAILED")
-    print("⚠️  Booking system won't work")
-print("=" * 50)
+    print("❌ Database failed to initialize")
+
+print("="*50)
 
 if __name__ == '__main__':
     app.run(debug=False, host='0.0.0.0', port=port)
