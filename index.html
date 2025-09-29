@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aapki Apni Taxi - Professional Taxi Booking Service</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="container">
+            <div class="nav-brand">
+                <h2>🚕 Aapki Apni Taxi</h2>
+            </div>
+            <div class="nav-links">
+                <a href="#" onclick="showPage('home')" class="nav-link">Home</a>
+                <a href="#" onclick="showPage('booking')" class="nav-link">Book Ride</a>
+                <a href="#" onclick="showPage('status')" class="nav-link">Check Status</a>
+                <a href="#" onclick="showPage('availability')" class="nav-link">Availability</a>
+                <a href="#" onclick="showPage('admin')" class="nav-link">Admin</a>
+            </div>
+            <div class="nav-mobile" onclick="toggleMobileNav()">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast hidden">
+        <div class="toast-content">
+            <span id="toast-message"></span>
+            <button onclick="hideToast()" class="toast-close">&times;</button>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loading" class="loading-overlay hidden">
+        <div class="loading-spinner"></div>
+        <p>Processing your request...</p>
+    </div>
+
+    <!-- Home Page -->
+    <div id="home-page" class="page active">
+        <section class="hero">
+            <div class="container">
+                <div class="hero-content">
+                    <h1>Book Your Ride in Minutes</h1>
+                    <p>Professional, reliable taxi service available 24/7. Safe and comfortable rides to your destination.</p>
+                    <div class="hero-actions">
+                        <button class="btn btn--primary btn--lg" onclick="showPage('booking')">Book Now</button>
+                        <button class="btn btn--secondary btn--lg" onclick="showPage('status')">Check Status</button>
+                    </div>
+                </div>
+                <div class="hero-image">
+                    <div class="taxi-icon">🚕</div>
+                </div>
+            </div>
+        </section>
+
+        <section class="features">
+            <div class="container">
+                <h2>Why Choose Aapki Apni Taxi?</h2>
+                <div class="features-grid">
+                    <div class="feature-card">
+                        <div class="feature-icon">⚡</div>
+                        <h3>Quick Booking</h3>
+                        <p>Quick and easy booking process with instant confirmation</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">🛡️</div>
+                        <h3>Safe & Reliable</h3>
+                        <p>Professional drivers and well-maintained vehicles</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">📱</div>
+                        <h3>Real-time Updates</h3>
+                        <p>Check your booking status anytime with your Booking ID</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">🔔</div>
+                        <h3>Instant Notifications</h3>
+                        <p>Get SMS updates when your booking is confirmed or updated</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- Booking Page -->
+    <div id="booking-page" class="page">
+        <div class="container">
+            <div class="page-header">
+                <h1>Book Your Taxi</h1>
+                <p>Fill in the details below to book your taxi</p>
+            </div>
+
+            <div class="booking-container">
+                <div class="card">
+                    <div class="card__body">
+                        <form id="booking-form" class="booking-form">
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label class="form-label" for="name">Full Name *</label>
+                                    <input type="text" id="name" name="name" class="form-control" required>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label" for="phone">Phone Number *</label>
+                                    <input type="tel" id="phone" name="phone" class="form-control" required placeholder="+1234567890">
+                                </div>
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label class="form-label" for="pickup">Pickup Location *</label>
+                                    <input type="text" id="pickup" name="pickup" class="form-control" required placeholder="e.g., Airport Terminal 1">
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label" for="drop">Drop Location *</label>
+                                    <input type="text" id="drop" name="drop" class="form-control" required placeholder="e.g., Downtown Hotel">
+                                </div>
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label class="form-label" for="datetime">Date & Time *</label>
+                                    <input type="datetime-local" id="datetime" name="datetime" class="form-control" required>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label" for="seats">Number of Seats *</label>
+                                    <select id="seats" name="seats" class="form-control" required>
+                                        <option value="">Select seats</option>
+                                        <option value="1">1 Seat</option>
+                                        <option value="2">2 Seats</option>
+                                        <option value="3">3 Seats</option>
+                                        <option value="4">4 Seats</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="form-actions">
+                                <button type="submit" class="btn btn--primary btn--full-width btn--lg">Submit Booking</button>
+                            </div>
+                        </form>
+
+                        <div class="booking-info">
+                            <p><strong>📱 Important:</strong> After booking, you'll receive a <strong>Booking ID</strong>. Save this ID to check your booking status later!</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+<div class="support-call">
+  📞 Need help?
+  <a href="tel:+919012871738" class="btn btn--primary">
+    Call for booking: 9012871738
+  </a>
+</div>
+
+    <!-- Status Check Page -->
+    <div id="status-page" class="page">
+        <div class="container">
+            <div class="page-header">
+                <h1>Check Booking Status</h1>
+                <p>Enter your Booking ID and Phone Number to check status</p>
+            </div>
+
+            <div class="status-container">
+                <div class="card">
+                    <div class="card__body">
+                        <form id="status-check-form" class="status-form">
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label class="form-label" for="status-booking-id">Booking ID *</label>
+                                    <input type="number" id="status-booking-id" name="booking-id" class="form-control" required placeholder="e.g., 123">
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label" for="status-phone">Phone Number *</label>
+                                    <input type="tel" id="status-phone" name="phone" class="form-control" required placeholder="Same number used for booking">
+                                </div>
+                            </div>
+
+                            <div class="form-actions">
+                                <button type="submit" class="btn btn--primary btn--full-width btn--lg">Check Status</button>
+                            </div>
+                        </form>
+
+                        <div class="status-help">
+                            <h4>Need Help?</h4>
+                            <ul>
+                                <li>Your Booking ID was provided when you made the booking</li>
+                                <li>Use the same phone number you used when booking</li>
+                                <li>Phone format doesn't matter (spaces and dashes are okay)</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Status Result -->
+                <div id="status-result" class="hidden">
+                    <!-- Results will be populated by JavaScript -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Availability Page -->
+    <div id="availability-page" class="page">
+        <div class="container">
+            <div class="page-header">
+                <h1>Seat Availability</h1>
+                <p>Check current seat availability status</p>
+            </div>
+
+            <div class="availability-container">
+                <div class="card">
+                    <div class="card__body">
+                        <div class="availability-status">
+                            <div class="status-icon">
+                                <span id="status-emoji">✅</span>
+                            </div>
+                            <div class="status-info">
+                                <h2 id="availability-status">Available</h2>
+                                <p>Seats are currently available for booking</p>
+                            </div>
+                        </div>
+
+                        <div class="availability-actions">
+                            <button class="btn btn--primary btn--lg" onclick="showPage('booking')">Book Now</button>
+                            <button class="btn btn--secondary btn--lg" onclick="location.reload()">Refresh Status</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Admin Page -->
+    <div id="admin-page" class="page">
+        <div class="container">
+            <!-- Admin Login -->
+            <div id="admin-login" class="login-container">
+                <div class="page-header">
+                    <h1>Admin Login</h1>
+                    <p>Please login to access the admin dashboard</p>
+                </div>
+
+                <div class="card">
+                    <div class="card__body">
+                        <form id="admin-login-form">
+                            <div class="form-group">
+                                <label class="form-label" for="username">Username</label>
+                                <input type="text" id="username" name="username" class="form-control" required>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label" for="password">Password</label>
+                                <input type="password" id="password" name="password" class="form-control" required>
+                            </div>
+                            <button type="submit" class="btn btn--primary btn--full-width">Login</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Admin Dashboard -->
+            <div id="admin-dashboard" class="hidden">
+                <div class="admin-header">
+                    <div>
+                        <h1>Admin Dashboard</h1>
+                        <p>Manage bookings and availability</p>
+                    </div>
+                    <button class="btn btn--secondary" onclick="adminLogout()">Logout</button>
+                </div>
+
+                <!-- Availability Management -->
+                <div class="card mb-24">
+                    <div class="card__header">
+                        <h3>Seat Availability Management</h3>
+                    </div>
+                    <div class="card__body">
+                        <div class="availability-controls">
+                            <div class="current-status">
+                                <span>Current Status:</span>
+                                <span id="admin-availability-status" class="status status--confirmed">Available</span>
+                            </div>
+                            <button id="toggle-availability" class="btn btn--outline" onclick="toggleAvailability()">
+                                Set Fully Booked
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Bookings Management -->
+                <div class="card">
+                    <div class="card__header">
+                        <h3>Recent Bookings</h3>
+                        <p>Confirm or reject pending bookings. Customer will be notified via SMS.</p>
+                    </div>
+                    <div class="card__body">
+                        <div class="table-container">
+                            <table class="bookings-table">
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Name</th>
+                                        <th>Phone</th>
+                                        <th>Pickup</th>
+                                        <th>Drop</th>
+                                        <th>Date/Time</th>
+                                        <th>Seats</th>
+                                        <th>Status</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="bookings-table-body">
+                                    <!-- Bookings will be populated by JavaScript -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
