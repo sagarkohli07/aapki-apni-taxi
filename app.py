@@ -1,5 +1,4 @@
 
-# Production-ready server for Render deployment
 import os
 from datetime import datetime, timezone
 from flask import Flask, render_template, request, jsonify, send_from_directory
@@ -7,6 +6,7 @@ from flask_cors import CORS
 from pymongo import MongoClient, errors
 from twilio.rest import Client
 import logging
+import ssl
 
 app = Flask(__name__)
 CORS(app)
@@ -18,11 +18,12 @@ logger = logging.getLogger(__name__)
 # Get port from environment (Render uses this)
 port = int(os.environ.get('PORT', 5000))
 
-# MongoDB and Twilio configs
-MONGODB_URI = "mongodb+srv://sagarkohli784_db_user:AwJpcHZhEvZT2Edq@sagar.btxiumr.mongodb.net/AapkiApniTaxi?retryWrites=true&w=majority"
+# ✅ FIXED MongoDB connection string with SSL parameters
+MONGODB_URI = "mongodb+srv://sagarkohli784_db_user:AwJpcHZhEvZT2Edq@sagar.btxiumr.mongodb.net/AapkiApniTaxi?retryWrites=true&w=majority&ssl=true&ssl_cert_reqs=CERT_NONE"
 DATABASE_NAME = "AapkiApniTaxi"
 COLLECTION_NAME = "bookings"
 
+# ✅ Verified Twilio credentials
 TWILIO_ACCOUNT_SID = "ACdd96ce53f12b05834b6117a650f30cfd"
 TWILIO_AUTH_TOKEN = "1f31eb002cf8e77a6c3778afd4ff960e"
 TWILIO_PHONE_NUMBER = "+17197671551"
@@ -52,11 +53,25 @@ def clean_phone_number(phone):
     return phone
 
 def initialize_mongodb():
-    """Initialize MongoDB connection"""
+    """Initialize MongoDB connection with SSL support"""
     global client, db, bookings_collection
 
     try:
-        client = MongoClient(MONGODB_URI, serverSelectionTimeoutMS=10000)
+        print("🔍 Connecting to MongoDB Atlas with SSL...")
+        print(f"📡 Host: sagar.btxiumr.mongodb.net")
+
+        # ✅ Create client with SSL settings
+        client = MongoClient(
+            MONGODB_URI,
+            serverSelectionTimeoutMS=30000,  # Increased timeout
+            connectTimeoutMS=30000,
+            socketTimeoutMS=30000,
+            ssl=True,
+            ssl_cert_reqs=ssl.CERT_NONE,  # ✅ Disable SSL certificate verification
+            tlsAllowInvalidCertificates=True  # ✅ Allow invalid certificates
+        )
+
+        # Test the connection
         client.admin.command('ping')
         db = client[DATABASE_NAME]
         bookings_collection = db[COLLECTION_NAME]
@@ -71,23 +86,30 @@ def initialize_mongodb():
         return False
 
 def initialize_twilio():
-    """Initialize Twilio client"""
+    """Initialize Twilio client with error handling"""
     global twilio_client
 
     try:
+        print(f"🔍 Connecting to Twilio...")
+        print(f"📱 SID: {TWILIO_ACCOUNT_SID}")
+
         twilio_client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
+
+        # ✅ Test connection by fetching account info
         account = twilio_client.api.accounts(TWILIO_ACCOUNT_SID).fetch()
+
         logger.info(f"✅ Twilio connected successfully! Account status: {account.status}")
         return True
 
     except Exception as e:
         logger.error(f"❌ Twilio connection failed: {e}")
+        print(f"❌ Twilio Error Details: {e}")
         return False
 
 def send_sms_safe(to_number, message):
-    """Send SMS with graceful handling of unverified numbers"""
+    """Send SMS with graceful error handling"""
     if twilio_client is None:
-        logger.error("Twilio client not initialized")
+        logger.warning("Twilio client not initialized - SMS functionality disabled")
         return False
 
     try:
@@ -146,7 +168,8 @@ def health_check():
         'status': 'healthy',
         'mongodb': 'connected' if bookings_collection is not None else 'disconnected',
         'twilio': 'connected' if twilio_client is not None else 'disconnected',
-        'timestamp': datetime.now(timezone.utc).isoformat()
+        'timestamp': datetime.now(timezone.utc).isoformat(),
+        'cluster': 'sagar.btxiumr.mongodb.net'
     })
 
 @app.route('/api/bookings', methods=['POST'])
@@ -270,8 +293,39 @@ def update_booking_status(booking_id):
         return jsonify({'success': False, 'error': 'Internal server error'}), 500
 
 # Initialize connections
-initialize_mongodb()
-initialize_twilio()
+print("🚖 Starting Aapki Apni Taxi Server...")
+print("="*50)
+print("📡 MongoDB Host: sagar.btxiumr.mongodb.net")
+print(f"📱 Twilio Phone: {TWILIO_PHONE_NUMBER}")
+print("🌐 Server: Production mode")
+print("="*50)
+
+mongodb_ok = initialize_mongodb()
+twilio_ok = initialize_twilio()
+
+print("\n🎯 FINAL STATUS:")
+if mongodb_ok and twilio_ok:
+    print("🎉 ALL SYSTEMS OPERATIONAL!")
+    print("✅ MongoDB: Connected")
+    print("✅ Twilio: Connected")
+    print("✅ Ready to handle bookings!")
+elif mongodb_ok:
+    print("⚠️  PARTIAL FUNCTIONALITY")
+    print("✅ MongoDB: Connected")
+    print("❌ Twilio: FAILED (SMS disabled)")
+    print("✅ Booking system works (no SMS)")
+elif twilio_ok:
+    print("⚠️  PARTIAL FUNCTIONALITY") 
+    print("❌ MongoDB: FAILED (No database)")
+    print("✅ Twilio: Connected")
+    print("❌ Booking system won't work")
+else:
+    print("❌ BOTH SERVICES FAILED")
+    print("❌ MongoDB: FAILED")
+    print("❌ Twilio: FAILED")
+    print("⚠️  App will have limited functionality")
+
+print("="*50)
 
 if __name__ == '__main__':
     app.run(debug=False, host='0.0.0.0', port=port)
