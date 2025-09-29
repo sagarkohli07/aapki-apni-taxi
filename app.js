@@ -363,3 +363,57 @@ document.addEventListener('DOMContentLoaded', function() {
     // Show home page by default
     showPage('home');
 });
+// ADD THESE FUNCTIONS TO YOUR app.js FILE
+
+// Fix 1: Add missing toggleAvailability function
+function toggleAvailability() {
+    const statusElement = document.getElementById('admin-current-status');
+    const button = event.target;
+
+    if (!statusElement) return;
+
+    const currentStatus = statusElement.textContent.trim();
+
+    if (currentStatus === 'AVAILABLE') {
+        statusElement.textContent = 'FULLY BOOKED';
+        statusElement.className = 'status-badge status-rejected';
+        button.textContent = 'Set Available';
+        showToast('Availability set to FULLY BOOKED', 'success');
+    } else {
+        statusElement.textContent = 'AVAILABLE';
+        statusElement.className = 'status-badge status-confirmed';
+        button.textContent = 'Set Fully Booked';
+        showToast('Availability set to AVAILABLE', 'success');
+    }
+}
+
+// Fix 2: Enhanced mobile menu toggle (ADD THIS TO EXISTING toggleMobileMenu)
+function toggleMobileMenu() {
+    const navLinks = document.querySelector('.nav-links');
+    const navMobile = document.querySelector('.nav-mobile');
+
+    if (navLinks && navMobile) {
+        const isActive = navLinks.classList.contains('nav-links--active');
+
+        if (isActive) {
+            navLinks.classList.remove('nav-links--active');
+            navMobile.classList.remove('nav-mobile--active');
+        } else {
+            navLinks.classList.add('nav-links--active');
+            navMobile.classList.add('nav-mobile--active');
+        }
+    }
+}
+
+// Fix 3: Close mobile menu when clicking outside
+document.addEventListener('click', function(event) {
+    const navLinks = document.querySelector('.nav-links');
+    const navMobile = document.querySelector('.nav-mobile');
+
+    if (navLinks && navMobile) {
+        if (!event.target.closest('.navbar') && navLinks.classList.contains('nav-links--active')) {
+            navLinks.classList.remove('nav-links--active');
+            navMobile.classList.remove('nav-mobile--active');
+        }
+    }
+});
