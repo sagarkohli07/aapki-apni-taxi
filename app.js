@@ -235,7 +235,7 @@ async function handleAdminLogin(event) {
     const username = formData.get('username');
     const password = formData.get('password');
 
-    if (username === 'admin' && password === 'admin123') {
+    if (username === 'taxigo' && password === 'admin@raj77') {
         isAdminLoggedIn = true;
         const loginDiv = document.getElementById('admin-login');
         const dashboardDiv = document.getElementById('admin-dashboard');
