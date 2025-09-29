@@ -1,17 +1,17 @@
 import os
 import sqlite3
-from datetime import datetime, timezone
+from datetime import datetime
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 
 app = Flask(__name__)
 CORS(app)
 
-DATABASE_FILE = 'bookings.db'
+DATABASE_FILE = 'taxi_bookings.db'
 
 def init_database():
     conn = sqlite3.connect(DATABASE_FILE)
-    # Use quoted column names to avoid SQL reserved word issues
+    # Use 'destination' instead of 'drop' to avoid SQL reserved word issue
     conn.execute("""
         CREATE TABLE IF NOT EXISTS bookings (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -27,7 +27,7 @@ def init_database():
     """)
     conn.commit()
     conn.close()
-    print("✅ Database initialized!")
+    print("✅ Database ready!")
 
 @app.route('/')
 def home():
@@ -39,15 +39,7 @@ def files(filename):
 
 @app.route('/api/health')
 def health():
-    try:
-        conn = sqlite3.connect(DATABASE_FILE)
-        cursor = conn.cursor()
-        cursor.execute('SELECT COUNT(*) FROM bookings')
-        count = cursor.fetchone()[0]
-        conn.close()
-        return {"status": "healthy", "database": "connected", "bookings": count}
-    except Exception as e:
-        return {"status": "error", "error": str(e)}
+    return {"status": "healthy", "database": "connected"}
 
 @app.route('/api/bookings', methods=['POST'])
 def create_booking():
@@ -64,7 +56,7 @@ def create_booking():
             data['name'],
             data['phone'], 
             data['pickup'],
-            data['drop'],  # Will be stored as 'destination'
+            data['drop'],  # Store in 'destination' column
             data['datetime'],
             int(data['seats']),
             datetime.now().isoformat()
@@ -74,12 +66,12 @@ def create_booking():
         conn.commit()
         conn.close()
 
-        print(f"✅ Booking {booking_id} created successfully")
+        print(f"✅ Booking {booking_id} created")
         return {"success": True, "booking_id": booking_id}
 
     except Exception as e:
-        print(f"❌ Error creating booking: {e}")
-        return {"success": False, "error": str(e)}
+        print(f"❌ Create error: {e}")
+        return {"success": False, "error": "Booking failed"}
 
 @app.route('/api/bookings')
 def get_bookings():
@@ -88,10 +80,10 @@ def get_bookings():
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
 
-        # Use 'destination' instead of 'drop' to avoid SQL reserved word issue
+        # Query using 'destination' and return as 'drop' for frontend
         cursor.execute("""
-            SELECT id, name, phone, pickup, destination as drop, 
-                   datetime, seats, status, created_at as createdAt
+            SELECT id, name, phone, pickup, destination, 
+                   datetime, seats, status, created_at
             FROM bookings ORDER BY id DESC
         """)
 
@@ -103,20 +95,20 @@ def get_bookings():
                 "name": row["name"],
                 "phone": row["phone"],
                 "pickup": row["pickup"],
-                "drop": row["drop"],
+                "drop": row["destination"],  # Return as 'drop' for frontend
                 "datetime": row["datetime"],
                 "seats": row["seats"],
                 "status": row["status"],
-                "createdAt": row["createdAt"]
+                "createdAt": row["created_at"]
             })
 
         conn.close()
-        print(f"✅ Retrieved {len(bookings)} bookings")
+        print(f"✅ Found {len(bookings)} bookings")
         return {"success": True, "bookings": bookings}
 
     except Exception as e:
-        print(f"❌ Error getting bookings: {e}")
-        return {"success": False, "bookings": [], "error": str(e)}
+        print(f"❌ Get error: {e}")
+        return {"success": False, "bookings": []}
 
 @app.route('/api/bookings/<int:booking_id>/update', methods=['POST'])
 def update_booking(booking_id):
@@ -130,16 +122,15 @@ def update_booking(booking_id):
         conn.commit()
         conn.close()
 
-        print(f"✅ Booking {booking_id} updated to {status}")
+        print(f"✅ Updated booking {booking_id} to {status}")
         return {"success": True, "message": f"Booking updated to {status}"}
 
     except Exception as e:
-        print(f"❌ Error updating booking: {e}")
-        return {"success": False, "error": str(e)}
+        print(f"❌ Update error: {e}")
+        return {"success": False, "error": "Update failed"}
 
-# Special endpoint for status checking
 @app.route('/api/bookings/status', methods=['POST'])
-def check_booking_status():
+def check_status():
     try:
         data = request.json
         booking_id = data.get('booking_id')
@@ -150,8 +141,8 @@ def check_booking_status():
         cursor = conn.cursor()
 
         cursor.execute("""
-            SELECT id, name, phone, pickup, destination as drop, 
-                   datetime, seats, status, created_at as createdAt
+            SELECT id, name, phone, pickup, destination, 
+                   datetime, seats, status, created_at
             FROM bookings WHERE id = ? AND phone = ?
         """, (booking_id, phone))
 
@@ -164,21 +155,21 @@ def check_booking_status():
                 "name": row["name"],
                 "phone": row["phone"],
                 "pickup": row["pickup"],
-                "drop": row["drop"],
+                "drop": row["destination"],
                 "datetime": row["datetime"],
                 "seats": row["seats"],
                 "status": row["status"],
-                "createdAt": row["createdAt"]
+                "createdAt": row["created_at"]
             }
             return {"success": True, "booking": booking}
         else:
             return {"success": False, "error": "Booking not found"}
 
     except Exception as e:
-        print(f"❌ Error checking status: {e}")
-        return {"success": False, "error": str(e)}
+        print(f"❌ Status error: {e}")
+        return {"success": False, "error": "Status check failed"}
 
-print("🚖 Starting Complete Taxi System...")
+print("🚖 Starting Final Taxi System...")
 init_database()
 
 if __name__ == '__main__':
